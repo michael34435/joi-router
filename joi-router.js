@@ -280,7 +280,7 @@ function wrapError(spec, parsePayload) {
     try {
       await parsePayload(ctx, next);
     } catch (err) {
-      captureError(ctx, 'type', err);
+      captureError(ctx, err);
       if (spec.validate.continueOnError) {
         return await next();
       } else {
@@ -385,11 +385,10 @@ function makeBodyParser(spec) {
  * @api private
  */
 
-function captureError(ctx, type, err) {
+function captureError(ctx, err) {
   // expose Error message to JSON.stringify()
-  err.msg = err.message;
-  if (!ctx.invalid) ctx.invalid = {};
-  ctx.invalid[type] = err;
+  if (!ctx.invalid) ctx.invalid = [];
+  ctx.invalid.push(err);
 }
 
 /**
@@ -406,18 +405,30 @@ function makeValidator(spec) {
   return async function validator(ctx, next) {
     if (!spec.validate) return await next();
 
-    let err;
+    let err = [];
 
     for (let i = 0; i < props.length; ++i) {
       const prop = props[i];
 
       if (spec.validate[prop]) {
-        err = validateInput(prop, ctx, spec.validate);
+        const error = validateInput(prop, ctx, spec.validate);
 
-        if (err) {
-          captureError(ctx, prop, err);
-          if (!spec.validate.continueOnError) return ctx.throw(err);
+        if (error) {
+          captureError(ctx, error);
+
+          err.push(error);
         }
+      }
+    }
+
+    if (err.length) {
+      if (!spec.validate.continueOnError) {
+        const validationError = new Error();
+        validationError.name = 'ValidationError';
+        validationError.details = err.reduce((current, value) => [...current, ...value.details], []);
+        validationError.status = spec.validate.failure;
+
+        return ctx.throw(validationError);
       }
     }
 
