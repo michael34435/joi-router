@@ -1,4 +1,4 @@
-'use strict';
+
 
 const assert = require('assert');
 const debug = require('debug')('koa-joi-router');
@@ -121,15 +121,15 @@ Router.prototype._addRoute = function addRoute(spec) {
   const handlers = flatten(spec.handler);
 
   const args = [
-    spec.path
+    spec.path,
   ].concat(preHandlers, [
     prepareRequest,
     specExposer,
     bodyParser,
-    validator
+    validator,
   ], handlers);
 
-  const router = this.router;
+  const { router } = this;
 
   spec.method.forEach((method) => {
     router[method].apply(router, args);
@@ -283,9 +283,8 @@ function wrapError(spec, parsePayload) {
       captureError(ctx, err);
       if (spec.validate.continueOnError) {
         return await next();
-      } else {
-        return ctx.throw(err);
       }
+      return ctx.throw(err);
     }
   };
 }
@@ -407,11 +406,29 @@ function makeValidator(spec) {
 
     let err = [];
 
-    for (let i = 0; i < props.length; ++i) {
+    for (let i = 0; i < props.length; i += 1) {
       const prop = props[i];
+      const validate = spec.validate[prop];
+      const request = ctx.request[prop];
 
-      if (spec.validate[prop]) {
-        const error = validateInput(prop, ctx, spec.validate);
+      if (validate) {
+        const error = Object
+          .keys(request)
+          .filter(key => validate[key])
+          .map(
+            (key) => {
+              const res = Joi.validate(
+                {
+                  [key]: request[key],
+                },
+                {
+                  [key]: validate[key],
+                },
+              );
+
+              return res.error;
+            },
+          );
 
         if (error) {
           captureError(ctx, error);
@@ -425,7 +442,21 @@ function makeValidator(spec) {
       if (!spec.validate.continueOnError) {
         const validationError = new Error();
         validationError.name = 'ValidationError';
-        validationError.details = err.reduce((current, value) => [...current, ...value.details], []);
+        validationError.details = err
+          .reduce(
+            (current, value) => [
+              ...current,
+              ...value,
+            ],
+            [],
+          )
+          .reduce(
+            (current, error) => [
+              ...current,
+              ...error.details,
+            ],
+            [],
+          );
         validationError.status = spec.validate.failure;
 
         return ctx.throw(validationError);
@@ -472,43 +503,6 @@ async function prepareRequest(ctx, next) {
 }
 
 /**
- * Validates request[prop] data with the defined validation schema.
- *
- * @param {String} prop
- * @param {koa.Request} request
- * @param {Object} validate
- * @returns {Error|undefined}
- * @api private
- */
-
-function validateInput(prop, ctx, validate) {
-  debug('validating %s', prop);
-
-  const request = ctx.request;
-  const res = Joi.validate(request[prop], validate[prop]);
-
-  if (res.error) {
-    res.error.status = validate.failure;
-    return res.error;
-  }
-
-  // update our request w/ the casted values
-  switch (prop) {
-    case 'header': // request.header is getter only, cannot set it
-    case 'query': // setting request.query directly causes casting back to strings
-      Object.keys(res.value).forEach((key) => {
-        request[prop][key] = res.value[key];
-      });
-      break;
-    case 'params':
-      request.params = ctx.params = res.value;
-      break;
-    default:
-      request[prop] = res.value;
-  }
-}
-
-/**
  * Routing shortcuts for all HTTP methods
  *
  * Example:
@@ -542,7 +536,7 @@ function validateInput(prop, ctx, validate) {
 methods.forEach((method) => {
   method = method.toLowerCase();
 
-  Router.prototype[method] = function(path) {
+  Router.prototype[method] = function (path) {
     // path, handler1, handler2, ...
     // path, config, handler1
     // path, config, handler1, handler2, ...
@@ -560,9 +554,9 @@ methods.forEach((method) => {
     }
 
     const spec = {
-      path: path,
-      method: method,
-      handler: fns
+      path,
+      method,
+      handler: fns,
     };
 
     Object.assign(spec, config);
