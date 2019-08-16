@@ -26,12 +26,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/koajs/joi-router.git"
+    "url": "https://github.com/michael34435/joi-router.git"
   },
   "bugs": {
-    "url": "https://github.com/koajs/joi-router/issues"
+    "url": "https://github.com/michael34435/joi-router/issues"
   },
-  "homepage": "https://github.com/koajs/joi-router",
+  "homepage": "https://github.com/michael34435/joi-router",
   "dependencies": {
     "@hapi/joi": "15.0.0",
     "await-busboy": "1.0.3",
