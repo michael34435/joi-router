@@ -428,9 +428,10 @@ function makeValidator(spec) {
 
               return res.error;
             },
-          );
+          )
+          .filter(Boolean);
 
-        if (error) {
+        if (error.length) {
           captureError(ctx, error);
 
           err.push(error);
