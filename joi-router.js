@@ -416,12 +416,27 @@ function makeValidator(spec) {
           .keys(validate)
           .map(
             (key) => {
+              const otherKeys = validate[key]._refs;
+              const getOtherKeys = fields => {
+                return otherKeys
+                  .reduce((current, otherKey) => {
+                    return {
+                      ...current,
+                      [otherKey]: fields[otherKey],
+                    }
+                  },
+                  {}
+                )
+              }
+
               const res = Joi.validate(
                 {
                   [key]: request[key],
+                  ...getOtherKeys(request),
                 },
                 {
                   [key]: validate[key],
+                  ...getOtherKeys(validate),
                 },
               );
 
