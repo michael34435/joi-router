@@ -413,8 +413,7 @@ function makeValidator(spec) {
 
       if (validate) {
         const error = Object
-          .keys(request)
-          .filter(key => validate[key])
+          .keys(validate)
           .map(
             (key) => {
               const res = Joi.validate(
